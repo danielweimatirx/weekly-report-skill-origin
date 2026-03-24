@@ -182,3 +182,27 @@ def test_main_empty_result(mock_get, capsys):
     captured = capsys.readouterr()
     data = json.loads(captured.out)
     assert data == []
+
+@patch("cli.requests.get")
+def test_search_issues_basic(mock_get):
+    """正常返回 issue 列表"""
+    mock_get.return_value = _mock_response(200, {
+        "total_count": 1,
+        "items": [{
+            "number": 301,
+            "title": "Bug: login timeout",
+            "state": "open",
+            "created_at": "2026-03-17T10:00:00Z",
+            "updated_at": "2026-03-19T15:00:00Z",
+            "html_url": "https://github.com/org/repo/issues/301",
+            "repository_url": "https://api.github.com/repos/org/repo",
+            "labels": [{"name": "bug"}],
+            "assignees": [{"login": "testuser"}],
+        }]
+    })
+    results = cli.search_issues("testuser", "org", "2026-03-17", "2026-03-21", "fake-token")
+    assert len(results) == 1
+    assert results[0]["issue_number"] == 301
+    assert results[0]["repo"] == "repo"
+    assert results[0]["labels"] == ["bug"]
+    assert results[0]["type"] == "issue"

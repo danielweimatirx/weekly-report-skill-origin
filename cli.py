@@ -87,6 +87,74 @@ def search_prs(user, org, since, until, token, query_prefix="author"):
     return all_items
 
 
+def search_issues(user, org, since, until, token):
+    """搜索用户参与的 issue（创建、评论、被 assign、被 mention），返回列表或错误字典。"""
+    if not token:
+        return {"error": "auth_failed", "message": "未提供 GitHub token"}
+
+    until_exclusive = (datetime.strptime(until, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    query = f"involves:{user} org:{org} type:issue updated:{since}T00:00:00+08:00..{until_exclusive}T00:00:00+08:00"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
+    all_items = []
+    page = 1
+
+    while True:
+        for attempt in range(3):
+            resp = requests.get(
+                f"{GITHUB_API}/search/issues",
+                params={"q": query, "per_page": 100, "page": page, "sort": "updated", "order": "desc"},
+                headers=headers,
+            )
+
+            try:
+                body = resp.json()
+            except Exception:
+                body = {}
+            msg = body.get("message", "")
+
+            if resp.status_code == 200:
+                remaining = int(resp.headers.get("X-RateLimit-Remaining", "99"))
+                if remaining < RATE_LIMIT_BUFFER:
+                    reset_at = int(resp.headers.get("X-RateLimit-Reset", "0"))
+                    wait = max(1, reset_at - int(time.time()))
+                    time.sleep(min(wait, 30))
+                break
+            elif resp.status_code in (401, 403) and "rate limit" not in msg.lower():
+                return {"error": "auth_failed", "message": msg or "认证失败"}
+            elif resp.status_code == 429 or (resp.status_code == 403 and "rate limit" in msg.lower()):
+                reset_at = int(resp.headers.get("X-RateLimit-Reset", "0"))
+                wait = max(1, reset_at - int(time.time()))
+                time.sleep(min(wait * (2 ** attempt), 60))
+            else:
+                return {"error": "github_unreachable", "message": f"GitHub API 返回 {resp.status_code}: {resp.text[:200]}"}
+        else:
+            return {"error": "github_unreachable", "message": "GitHub API 请求失败，已重试 3 次"}
+
+        items = body.get("items", [])
+        for item in items:
+            repo_name = item["repository_url"].rsplit("/", 1)[-1]
+            all_items.append({
+                "type": "issue",
+                "repo": repo_name,
+                "issue_number": item["number"],
+                "title": item["title"],
+                "state": item["state"],
+                "created_at": item["created_at"][:10],
+                "updated_at": item["updated_at"][:10],
+                "labels": [l["name"] for l in item.get("labels", [])],
+                "assignees": [a["login"] for a in item.get("assignees", [])],
+                "url": item["html_url"],
+            })
+
+        if len(items) < 100:
+            break
+        page += 1
+
+    return all_items
+
+
 def merge_and_dedupe(authored, reviewed):
     """合并 authored 和 reviewed 的 PR 列表，按 repo+pr_number 去重，合并角色。"""
     index = {}
