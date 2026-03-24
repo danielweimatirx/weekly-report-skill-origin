@@ -47,7 +47,16 @@ python ${CLAUDE_SKILL_DIR}/cli.py --user {github_username} --org matrixorigin --
 
 ## 4. 生成周报
 
-将采集到的 PR 和 issue 数据按状态分类，用中文重新描述，要求通俗易懂，技术术语保留英文（如 S3、gRPC、MCP、MOWL 等）。
+### 关联分析
+
+先分析 PR 和 issue 的关联关系：
+- 检查 PR 的 `body` 字段中是否包含 `fixes #xxx`、`closes #xxx`、`resolves #xxx`，或直接提到 issue 编号
+- 检查 PR 和 issue 的 `body` 内容是否描述同一件事（如同一个功能或 bug）
+- 将关联的 PR 和 issue 合并为一条，作为同一项工作输出
+
+### 描述生成
+
+用中文重新描述每项工作，要求通俗易懂，技术术语保留英文（如 S3、gRPC、MCP、MOWL 等）。优先从 `body` 字段理解工作内容，而不是只看标题——body 通常包含更完整的上下文和动机。
 
 ### 分类规则
 
