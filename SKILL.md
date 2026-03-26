@@ -154,9 +154,9 @@ python ${CLAUDE_SKILL_DIR}/cli.py fetch --user {github_username} --org matrixori
 ## 周报配置
 
 - GitHub Token: ghp_xxxxx
-- GitHub 用户名: aqqi666
+- GitHub 用户名: your-username
 - 岗位: 后端研发
-- 仓库范围: org:matrixorigin, repo:user/my-repo
+- 仓库范围: org:your-org, repo:user/your-repo
 - 补充内容偏好: 每次询问
 ```
 
