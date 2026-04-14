@@ -95,6 +95,20 @@ python ${CLAUDE_SKILL_DIR}/cli.py wecom-team --department-id {id}
 
 找到对应 ID 后，在 fetch-team 时传 `--department-id`，**不修改用户的默认配置**。
 
+### 0.5 管理类指令（非周报主流程）
+
+如果用户的话不是在要周报，而是**让你管理企微数据或配置**，直接执行对应命令：
+
+| 用户说 | 动作 |
+|---|---|
+| "刷新企微" / "同步企微" / "同步组织架构" / "重新拉企微" / "企微数据更新下" | 跑 `python ${CLAUDE_SKILL_DIR}/cli.py wecom-sync`，把摘要回给用户（X 部门 / Y 人 / Z 已映射 GitHub） |
+| "企微最后什么时候同步的" / "上次刷新是什么时候" | 读 `~/.weekly-report/wecom.json` 的 `synced_at` 字段，告诉用户 |
+| "把我设成 XX 部门的 leader" / "XX 也应该是 leader" | 跑 `leader-override --set {userid} {dept_ids}`，先 `wecom-team` 查部门 ID |
+| "改成几级汇报" / "报告层级改为 N" | `config --set report_depth N` |
+| "查一下我的身份" / "我是谁" | 按 0.2 节跑 whoami，展示结果 |
+
+执行完告诉用户结果即可，不用走后面的周报流程。
+
 ---
 
 ## 分流后进入对应流程
