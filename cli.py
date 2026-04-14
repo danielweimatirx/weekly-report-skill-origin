@@ -24,6 +24,23 @@ CACHE_TTL_SECONDS = 24 * 3600  # 24 小时
 REQUIRED_FIELDS = ["token", "username", "role", "scopes"]
 
 
+def compute_missing(config):
+    """计算缺失的配置项。
+
+    规则：
+    - token / username / scopes 必填
+    - role：如果同时配了 wecom_corpid + wecom_secret，说明部署时能从企微 whoami 拿到
+      position，role 不再强制要求（即使本地也有 config.role 兜底）；
+      否则（纯本地无企微场景）仍必填。
+    """
+    base_required = ["token", "username", "scopes"]
+    missing = [f for f in base_required if not config.get(f)]
+    has_wecom = bool(config.get("wecom_corpid") and config.get("wecom_secret"))
+    if not has_wecom and not config.get("role"):
+        missing.append("role")
+    return missing
+
+
 def cache_path(dept_id, since, until):
     """按部门 + 日期范围的缓存文件路径。"""
     return os.path.join(CACHE_DIR, f"dept_{dept_id}_{since}_{until}.json")
@@ -591,7 +608,7 @@ def cmd_config(args):
         save_config(config)
 
     # 始终输出当前配置和缺失字段
-    missing = [f for f in REQUIRED_FIELDS if not config.get(f)]
+    missing = compute_missing(config)
     result = {"config": config, "missing": missing, "config_file": CONFIG_FILE}
     json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
     print()
@@ -643,7 +660,7 @@ def cmd_fetch(args):
     config = load_config()
 
     # 检查必填字段
-    missing = [f for f in REQUIRED_FIELDS if not config.get(f)]
+    missing = compute_missing(config)
     if missing:
         json.dump({
             "error": "config_incomplete",
@@ -1105,8 +1122,10 @@ def cmd_fetch_team(args):
     """采集整个团队的数据。支持 GitHub team 和企微部门两种来源。"""
     config = load_config()
 
-    # 基础配置校验
-    missing = [f for f in ("token", "role", "scopes") if not config.get(f)]
+    # 基础配置校验（fetch-team 下 role 不强制，可由 SKILL.md 从 whoami.position 拿）
+    missing = [f for f in ("token", "scopes") if not config.get(f)]
+    if not (config.get("wecom_corpid") and config.get("wecom_secret")) and not config.get("role"):
+        missing.append("role")
     if missing:
         json.dump({
             "error": "config_incomplete",
